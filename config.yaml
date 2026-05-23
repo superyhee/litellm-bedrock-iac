@@ -1,37 +1,37 @@
 # ==============================================================================
-# LiteLLM Proxy 配置 — Claude Code + Amazon Bedrock
+# LiteLLM Proxy config — Claude Code + Amazon Bedrock
 # ==============================================================================
-# ⚠️ 注意：AWS 部署时此文件已 base64 内嵌进 template.yaml 的 TaskDef，
-#    修改后需 `make deploy` 才会生效。
+# ⚠️ Note: this file is base64-embedded into the TaskDef of template.yaml for
+#    AWS deploys. Edit + run `make deploy` to apply changes in production.
 #
-#    本地开发（docker-compose）会通过 volume 挂载此文件到容器。
+#    Local dev (docker-compose) mounts this file directly via volume.
 # ==============================================================================
 
 model_list:
   # ==========================================
-  # Primary: Amazon Bedrock (Invoke 模式)
+  # Primary: Amazon Bedrock (Invoke mode)
   # ==========================================
 
-  # Claude Sonnet 4.6 — 日常主力（最佳性价比）
+  # Claude Sonnet 4.6 — daily driver (best price/perf)
   - model_name: claude-sonnet-4-6
     litellm_params:
       model: bedrock/invoke/us.anthropic.claude-sonnet-4-6
       aws_region_name: us-west-2
 
-  # Claude Opus 4.7 — 复杂推理任务
+  # Claude Opus 4.7 — heavy reasoning
   - model_name: claude-opus-4-7
     litellm_params:
       model: bedrock/invoke/us.anthropic.claude-opus-4-7
       aws_region_name: us-west-2
 
-  # Claude Haiku 4.5 — 子代理 / 读取 / 分类（最便宜）
+  # Claude Haiku 4.5 — sub-agents / reads / classification (cheapest)
   - model_name: claude-haiku-4-5-20251001
     litellm_params:
       model: bedrock/invoke/us.anthropic.claude-haiku-4-5-20251001-v1:0
       aws_region_name: us-west-2
 
   # ==========================================
-  # Fallback: Anthropic API 直连（Bedrock 限流时自动切换）
+  # Fallback: direct Anthropic API (used when Bedrock throttles)
   # ==========================================
   - model_name: claude-sonnet-4-6-fallback
     litellm_params:
@@ -44,13 +44,13 @@ model_list:
       api_key: os.environ/ANTHROPIC_API_KEY
 
 # ==============================================================================
-# LiteLLM 核心设置
+# LiteLLM core settings
 # ==============================================================================
 litellm_settings:
-  # API 认证
+  # API auth
   master_key: os.environ/LITELLM_MASTER_KEY
 
-  # Prompt Caching（跨实例共享 — 通过 Redis）
+  # Prompt Caching (shared across instances via Redis)
   cache: true
   cache_params:
     type: "redis"
@@ -58,52 +58,52 @@ litellm_settings:
     port: os.environ/REDIS_PORT
     ttl: 300
 
-  # 成本追踪 / 可观测性回调（默认关闭）
-  # 如需接入 Langfuse：
-  #   1. 设置 LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY 环境变量
-  #   2. 取消下面一行注释
+  # Cost tracking / observability callbacks (off by default)
+  # To enable Langfuse:
+  #   1. set LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY env vars
+  #   2. uncomment the line below
   # success_callback: ["langfuse"]
 
   set_verbose: false
 
 # ==============================================================================
-# 路由策略
+# Routing
 # ==============================================================================
 router_settings:
-  # 路由策略:
-  #   - "simple-shuffle": 随机
-  #   - "least-busy": 最少请求数（默认）
-  #   - "latency-based-routing": 最低延迟
-  #   - "cost-based-routing": 最低成本
+  # Routing strategies:
+  #   - "simple-shuffle": random
+  #   - "least-busy": fewest in-flight requests (default)
+  #   - "latency-based-routing": lowest latency
+  #   - "cost-based-routing": lowest cost
   routing_strategy: "least-busy"
 
-  # 重试与超时
+  # Retries and timeouts
   num_retries: 3
   timeout: 120
   retry_after: 5
 
-  # Fallback：Bedrock 故障时切 Anthropic API
+  # Fallbacks: route to Anthropic API when Bedrock fails
   fallbacks:
     - claude-sonnet-4-6: ["claude-sonnet-4-6-fallback"]
     - claude-haiku-4-5-20251001: ["claude-haiku-4-5-fallback"]
 
-  # 速率限制（按需取消注释）
+  # Rate limits (uncomment as needed)
   # model_group_max_rpm:
   #   claude-sonnet-4-6: 100
   #   claude-opus-4-7: 20
   #   claude-haiku-4-5-20251001: 200
 
 # ==============================================================================
-# 全局预算管控 + 数据库
+# Global budget + database
 # ==============================================================================
 general_settings:
-  # 全局月度预算上限（美元）
+  # Global monthly budget (USD)
   max_budget: 2000
   budget_duration: "monthly"
 
-  # 数据库（持久化 Virtual Keys / Spend / UI 配置）
+  # Database (persists Virtual Keys / Spend / UI config)
   database_url: os.environ/DATABASE_URL
   store_model_in_db: true
 
-  # UI 访问范围
-  # ui_access_mode: "all"  # 或 "admin_only"
+  # UI access scope
+  # ui_access_mode: "all"  # or "admin_only"
