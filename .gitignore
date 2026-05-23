@@ -1,0 +1,16 @@
+# Local secrets - NEVER commit
+.env
+.env.deployed
+.env.local
+*.pem
+*.key
+
+# SAM build artifacts
+.aws-sam/
+samconfig.toml
+
+# Misc
+.DS_Store
+*.log
+__pycache__/
+*.pyc

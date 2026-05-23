@@ -1,0 +1,82 @@
+# ==============================================================================
+# LiteLLM 本地开发部署（与生产 AWS 架构对齐）
+#   - litellm-database 镜像（含 prisma）
+#   - PostgreSQL（持久化 virtual keys / spend）
+#   - Redis（共享 prompt cache）
+# ==============================================================================
+# 用法:
+#   cp .env.example .env && 编辑 .env 填入凭证
+#   docker-compose up -d
+#   open http://localhost:4000/ui/   # admin / $LITELLM_MASTER_KEY
+# ==============================================================================
+
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm-database:main-latest
+    container_name: litellm-proxy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    environment:
+      # 核心凭证
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-dev-key}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LITELLM_LICENSE=${LITELLM_LICENSE_KEY:-}
+
+      # UI 登录
+      - UI_USERNAME=admin
+      - UI_PASSWORD=${LITELLM_MASTER_KEY:-sk-litellm-dev-key}
+
+      # 数据库 / 缓存（指向同 compose 内的服务）
+      - DATABASE_URL=postgresql://litellm:litellm@postgres:5432/litellm
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # AWS 凭证（本地需要；生产用 ECS Task Role）
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2}
+    # 入口与生产一致：先 prisma db push 再启 litellm
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        set -e
+        echo "[INIT] Running prisma db push..."
+        cd /app && prisma db push --schema /app/schema.prisma --accept-data-loss --skip-generate
+        echo "[INIT] Starting litellm..."
+        exec litellm --config /app/config.yaml --port 4000 --host 0.0.0.0
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: litellm-postgres
+    environment:
+      - POSTGRES_USER=litellm
+      - POSTGRES_PASSWORD=litellm
+      - POSTGRES_DB=litellm
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: litellm-redis
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
