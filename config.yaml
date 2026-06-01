@@ -24,6 +24,12 @@ model_list:
       model: bedrock/invoke/us.anthropic.claude-opus-4-7
       aws_region_name: us-west-2
 
+  # Claude Opus 4.8 — latest flagship reasoning model
+  - model_name: claude-opus-4-8
+    litellm_params:
+      model: bedrock/invoke/us.anthropic.claude-opus-4-8
+      aws_region_name: us-west-2
+
   # Claude Haiku 4.5 — sub-agents / reads / classification (cheapest)
   - model_name: claude-haiku-4-5-20251001
     litellm_params:
@@ -86,6 +92,7 @@ router_settings:
   fallbacks:
     - claude-sonnet-4-6: ["claude-sonnet-4-6-fallback"]
     - claude-haiku-4-5-20251001: ["claude-haiku-4-5-fallback"]
+    - claude-opus-4-8: ["claude-opus-4-7"]   # Opus 4.8 throttle → fall back to 4.7
 
   # Rate limits (uncomment as needed)
   # model_group_max_rpm:
